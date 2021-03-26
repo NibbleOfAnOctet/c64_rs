@@ -6,17 +6,9 @@ const SIGN_BIT:u8 = 0b10000000;
 
 fn bitwise_or(cpu: &mut CPU6510, value:u8){
     cpu.A|=value;
-    if cpu.A==0 {
-        cpu.set_flag(CPUFlag::Zero);
-    }else{
-        cpu.clear_flag(CPUFlag::Zero);
-    }
 
-    if cpu.A&SIGN_BIT == SIGN_BIT{
-        cpu.set_flag(CPUFlag::Negative);
-    }else{
-        cpu.clear_flag(CPUFlag::Negative);
-    }
+    cpu.set_flag_if(CPUFlag::Zero, cpu.A==0);
+    cpu.set_flag_if(CPUFlag::Zero, is_negative(cpu.A));
 }
 
 fn bitwise_and(cpu: &mut CPU6510, value:u8){
