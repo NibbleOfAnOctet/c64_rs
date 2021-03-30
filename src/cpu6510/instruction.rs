@@ -34,14 +34,14 @@ pub fn get_all_instructions() -> Vec<Instruction> {
 pub enum Implementation {
     Implied(fn(&mut CPU6510) -> u8),
     Immediate(fn(&mut CPU6510, u8) -> u8),  //#$00
-    ZP(fn(&mut CPU6510, u8) -> u8),         //$00
-    ZPX(fn(&mut CPU6510, u8) -> u8),        //$00,X
-    ZPY(fn(&mut CPU6510, u8) -> u8),        //$00,Y
-    Indirect(fn(&mut CPU6510, u8) -> u8),   //($0000)
-    IndirectZX(fn(&mut CPU6510, u8) -> u8), //($00),X
-    IndirectZY(fn(&mut CPU6510, u8) -> u8), //($00,Y)
-    Abs(fn(&mut CPU6510, u8) -> u8),        //$0000
-    AbsX(fn(&mut CPU6510, u8) -> u8),       //$0000, X
-    AbsY(fn(&mut CPU6510, u8) -> u8),       //$0000, Y
-    Relative(fn(&mut CPU6510, u8) -> u8),   //PC+$0000
+    ZP(fn(&mut CPU6510, u8, u16) -> u8),         //$00
+    ZPX(fn(&mut CPU6510, u8, u16) -> u8),        //$00,X
+    ZPY(fn(&mut CPU6510, u8, u16) -> u8),        //$00,Y
+    Indirect(fn(&mut CPU6510, u8, u16) -> u8),   //($0000)
+    IndirectZX(fn(&mut CPU6510, u8, u16) -> u8), //($00),X
+    IndirectZY(fn(&mut CPU6510, u8, u16) -> u8), //($00,Y)
+    Abs(fn(&mut CPU6510, u8, u16) -> u8),        //$0000
+    AbsX(fn(&mut CPU6510, u8, u16) -> u8),       //$0000, X
+    AbsY(fn(&mut CPU6510, u8, u16) -> u8),       //$0000, Y
+    Relative(fn(&mut CPU6510, u8, u16) -> u8),   //PC+$0000
 }

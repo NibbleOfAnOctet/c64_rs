@@ -1,7 +1,7 @@
 mod instruction;
-use instruction::{Implementation, Instruction};
 use super::random_access_memory::RandomAccessMemory;
-
+use instruction::Instruction;
+use instruction::Implementation;
 pub enum CPUFlag{
     Negative    =0b10000000,
     Overflow    =0b01000000,
@@ -17,17 +17,29 @@ pub struct CPU6510 {
     A: u8, //Accumulator
     Y: u8, //Index register Y
     X: u8,   //Index register X
-    PC: u16, //Program counter
+    pub PC: u16, //Program counter
     S: u16,  //Stack pointer
     P: u8, //Status register (Negative, Overflow, X, Break, Decimal mode, IRQ Disable, Zero, Carry)
+    pub ram: RandomAccessMemory
 }
 
 impl CPU6510 {
-    pub fn run(&mut self, ram: &mut RandomAccessMemory){
+
+    pub fn not_implemented(&mut self){
+        print!("NOT IMPLEMENTED: ");
+        //self.set_flag(CPUFlag::Break);
+    }
+
+    pub fn load_program(&mut self, bytes: Vec<u8>){
+        for i in 0..bytes.len(){
+            self.ram.write_byte(i as u16, bytes[i]);
+        }
+    }
+    pub fn run(&mut self){
         loop{
             if self.flag_is_set(CPUFlag::Break) { println!("(Halted: Break flag set)"); break; }
 
-            self.step(ram);
+            self.step();
         }
     }
 
@@ -67,14 +79,15 @@ impl CPU6510 {
             PC: 0,
             S: 0,
             P: 0,
-            opcode_table: opcode_table
+            opcode_table: opcode_table,
+            ram:RandomAccessMemory::new()
         }
     }
 
-    pub fn step(&mut self, ram: &mut RandomAccessMemory) {
-        let opcode = ram.read_byte(self.PC);
+    pub fn step(&mut self) {
+        let opcode = self.ram.read_byte(self.PC);
         let instruction = self.opcode_table[opcode as usize];
-        
+        print!("{:#04X}: ", self.PC);
         match instruction.implementation {
             Some(Implementation::Implied(implementation)) => {
                 let cycles = implementation(self);
@@ -83,89 +96,101 @@ impl CPU6510 {
                 println!("{}", instruction.mnemonic);
             },
             Some(Implementation::Abs(implementation))=>{
-                let argument= ram.read_word(self.PC+1);
-                let value = ram.read_byte(argument);
-                let cycles = implementation(self, value);
+                let argument= self.ram.read_word(self.PC+1);
+                let value = self.ram.read_byte(argument);
+                let cycles = implementation(self, value, argument);
                 self.PC+=3;
 
                 println!("{} ${:04X}", instruction.mnemonic, argument);
             },
             Some(Implementation::AbsX(implementation))=>{
-                let argument= ram.read_word(self.PC+1);
-                let value = ram.read_byte(argument+self.X as u16);
-                let cycles = implementation(self, value);
+                let argument= self.ram.read_word(self.PC+1);
+                let address = argument+self.X as u16;
+                let value = self.ram.read_byte(address);
+                let cycles = implementation(self, value, argument);
                 self.PC+=3;
 
                 println!("{} ${:04X}", instruction.mnemonic, argument);
             },
             Some(Implementation::AbsY(implementation))=>{
-                let argument= ram.read_word(self.PC+1);
-                let value = ram.read_byte(argument+self.Y as u16);
-                let cycles = implementation(self, value);
+                let argument= self.ram.read_word(self.PC+1);
+                let address = argument+self.Y as u16;
+                let value = self.ram.read_byte(address);
+                let cycles = implementation(self, value,address);
                 self.PC+=3;
 
                 println!("{} ${:04X}", instruction.mnemonic, argument);
             },
             Some(Implementation::ZP(implementation))=>{
-                let argument= ram.read_byte(self.PC+1);
-                let value = ram.read_byte(argument as u16);
-                let cycles = implementation(self, value);
+                let argument= self.ram.read_byte(self.PC+1);
+                let value = self.ram.read_byte(argument as u16);
+                let cycles = implementation(self, value, argument as u16);
                 self.PC+=2;
 
                 println!("{} ${:02X}", instruction.mnemonic, argument);
             },
             Some(Implementation::ZPX(implementation))=>{
-                let argument= ram.read_byte(self.PC+1);
-                let value = ram.read_byte((argument as u16).wrapping_add(self.X as u16));
-                let cycles = implementation(self, value);
+                let argument= self.ram.read_byte(self.PC+1);
+                let address = (argument as u16).wrapping_add(self.X as u16);
+                let value = self.ram.read_byte(address);
+                let cycles = implementation(self, value, address);
                 self.PC+=2;
 
                 println!("{} (${:02X},X)", instruction.mnemonic, argument);
             },
             Some(Implementation::ZPY(implementation))=>{
-                let argument= ram.read_byte(self.PC+1);
-                let value = ram.read_byte((argument as u16).wrapping_add(self.Y as u16));
-                let cycles = implementation(self, value);
+                let argument= self.ram.read_byte(self.PC+1);
+                let address = (argument as u16).wrapping_add(self.Y as u16);
+                let value = self.ram.read_byte(address);
+                let cycles = implementation(self, value, address);
                 self.PC+=2;
 
                 println!("{} (${:02X},Y)", instruction.mnemonic, argument);
             },
             Some(Implementation::Indirect(implementation))=>{
-                let argument = ram.read_word(self.PC+1);
-                let value = ram.read_byte_indirect(argument);
-                let cycles = implementation(self, value);
+                let argument = self.ram.read_word(self.PC+1);
+                let value = self.ram.read_byte_indirect(argument);
+                let cycles = implementation(self, value, argument);
                 self.PC+=3;
 
                 println!("{} (${:04X})", instruction.mnemonic, argument);
             },
             Some(Implementation::IndirectZX(implementation))=>{
-                let argument= ram.read_byte(self.PC+1);
-                let value = ram.read_byte_indirect(argument.wrapping_add(self.X) as u16);
-                let cycles = implementation(self, value);
+                let argument= self.ram.read_byte(self.PC+1);
+                let address=argument.wrapping_add(self.X) as u16;
+                let value = self.ram.read_byte_indirect(address);
+                let cycles = implementation(self, value, address);
                 self.PC+=2;
                 println!("{} (${:02X},X)", instruction.mnemonic, argument);
             },
             Some(Implementation::IndirectZY(implementation))=>{
-                let argument = ram.read_byte(self.PC+1);
-                let value = ram.read_byte_indirect((argument&0xff) as u16)+self.Y as u8;
-                let cycles = implementation(self, argument);
+                let argument = self.ram.read_byte(self.PC+1);
+                let address= (argument&0xff) as u16;
+                let value = self.ram.read_byte_indirect(address)+self.Y as u8;
+                let cycles = implementation(self, argument, address);
                 self.PC+=2;
 
                 println!("{} (${:02X}),Y", instruction.mnemonic, argument);
             },
             Some(Implementation::Immediate(implementation)) => {
-                let argument = ram.read_byte(self.PC+1);
+                let argument = self.ram.read_byte(self.PC+1);
                 let cycles = implementation(self, argument);
                 println!("{} #${:02X}", instruction.mnemonic, argument);
                 self.PC+=2;
             },
             Some(Implementation::Relative(implementation)) => {
-                let argument = ram.read_word(self.PC+1);
-                let address = self.PC+argument;
-                let value = ram.read_byte(address);
-                let cycles = implementation(self, value);
-                println!("{} ${:04X}", instruction.mnemonic, argument);
-                self.PC+=3;
+                let argument = self.ram.read_byte(self.PC+1);
+
+                let address = match (argument&0x80)>>7==1{
+                    true=>self.PC.wrapping_sub((!argument&0x7f) as u16) + 1,
+                    false=>self.PC.wrapping_add((argument&0x7f) as u16) + 2
+                };
+
+                let value = self.ram.read_byte(address+2);
+                let cycles = implementation(self, value, address);
+
+                println!("{} ${:04X}", instruction.mnemonic, address);
+                self.PC+=2;
             },
             None=>{
                 panic!("{:02X} Not implemented!", opcode);

@@ -1,11 +1,17 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
-mod commodore;
+mod random_access_memory;
+mod cpu6510;
+use std::fs;
+
+use cpu6510::CPU6510;
 
 fn main() {
-    let mut commodore = commodore::Commodore::new();
-    let program = Vec::<u8>::from([0x01, 0x04, 0x00, 0x00, 0x00, 0x08, 0x00, 0x03, 0xDE]);
-
-    commodore.load_program(program);
+    let mut commodore = CPU6510::new();
+    let rom = fs::read("kernal.bin").unwrap();
+    for i in 0..rom.len(){
+        commodore.ram.write_byte((0xe000+i) as u16, rom[i as usize]);
+    }
+    commodore.PC = 0xe000;
     commodore.run();
 }
